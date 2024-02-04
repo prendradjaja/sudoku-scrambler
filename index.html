@@ -1,8 +1,12 @@
 <html>
   <head>
     <link rel="stylesheet" href="./styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/brython@3/brython.min.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/brython@3/brython_stdlib.js">
+    </script>
   </head>
-  <body>
+  <body onload="brython()">
     <input id="input" placeholder="e.g. 003020600900305001001806400008102900700000008006708200002609500800203009005010300">
     <button id="scramble">Scramble</button>
     <div id="result-grid">
@@ -16,6 +20,7 @@
       <div class="row"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
       <div class="row"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
     </div>
-    <div id="result-string"></div>
+    <div id="result-string">&nbsp;</div>
+    <script type="text/python" src="./main.py"></script>
   </body>
 </html>

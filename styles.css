@@ -41,6 +41,11 @@ body {
   width: var(--cell-size);
   flex-shrink: 0;
   flex-grow: 0;
+  font-size: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: sans-serif;
 }
 
 .row > div:nth-child(3),

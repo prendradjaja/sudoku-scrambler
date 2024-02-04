@@ -38,31 +38,92 @@ zeros_string = '0000000000000000000000000000000000000000000000000000000000000000
 
 
 def main():
-    example_unsolved = '003020600900305001001806400008102900700000008006708200002609500800203009005010300'
-    example_solved =   '483921657967345821251876493548132976729564138136798245372689514814253769695417382'
-
-    # Can "scramble" a sudoku into an equivalent one
-    shuffled = transform_random(example_solved)
-    print(shuffled)
-    show(parse(shuffled))
-
-    # Works for solved or unsolved sudokus
-    shuffled = transform_random(example_unsolved)
-    print(shuffled)
-    show(parse(shuffled))
+    S('button#scramble').addEventListener('click', handle_scramble_click)
+    S('#input').addEventListener('keydown', handle_input_keydown)
 
 
-# TODO Maybe use permutation index instead of permutation
-def _relabel(digits, permutation):
-    '''
-    permutation: a digitstring e.g. '987654321'
-    '''
-    return digits.translate(
-        str.maketrans(ALL_DIGITS_STRING, permutation)
+def handle_scramble_click(event=None):
+    # Clean up and validate input
+    puzzle_string = S('#input').value.strip()
+    is_valid_input = (
+        len(puzzle_string) == 81
+        and set(puzzle_string) <= set('0123456789')
     )
+    if not is_valid_input:
+        browser.alert('invalid')
+        return
+
+    scrambled = scramble(puzzle_string)
+    S('#result-string').innerHTML = scrambled
+
+    for value, cell in zip(scrambled, SS('#result-grid .row > div')):
+        if value != '0':
+            cell.innerHTML = value
+        else:
+            cell.innerHTML = ''
 
 
-def _permute_bands(digits, permutation_index):
+def handle_input_keydown(event):
+    if event.key == 'Enter':
+        handle_scramble_click()
+
+
+def scramble(digits):
+    '''
+    >>> random.seed(0, version=2)
+
+    Can "scramble" a sudoku into an equivalent one
+    >>> scrambled = scramble('483921657967345821251876493548132976729564138136798245372689514814253769695417382')
+    >>> print(scrambled)
+    698452371531687942742139568317526894854973126926814735289345617465791283173268459
+    >>> show(parse(scrambled))
+    6 9 8 4 5 2 3 7 1
+    5 3 1 6 8 7 9 4 2
+    7 4 2 1 3 9 5 6 8
+    3 1 7 5 2 6 8 9 4
+    8 5 4 9 7 3 1 2 6
+    9 2 6 8 1 4 7 3 5
+    2 8 9 3 4 5 6 1 7
+    4 6 5 7 9 1 2 8 3
+    1 7 3 2 6 8 4 5 9
+    <BLANKLINE>
+
+    Works for solved or unsolved sudokus
+    >>> scrambled = scramble('003020600900305001001806400008102900700000008006708200002609500800203009005010300')
+    >>> print(scrambled)
+    000000000150706024008020300205064013060100000407058062000000000940507086001080200
+    >>> show(parse(scrambled))
+    0 0 0 0 0 0 0 0 0
+    1 5 0 7 0 6 0 2 4
+    0 0 8 0 2 0 3 0 0
+    2 0 5 0 6 4 0 1 3
+    0 6 0 1 0 0 0 0 0
+    4 0 7 0 5 8 0 6 2
+    0 0 0 0 0 0 0 0 0
+    9 4 0 5 0 7 0 8 6
+    0 0 1 0 8 0 2 0 0
+    <BLANKLINE>
+    '''
+    digits = _relabel(digits)
+
+    digits = _permute_bands(digits)
+    digits = _permute_within_bands(digits)
+
+    digits = _permute_stacks(digits)
+    digits = _permute_within_stacks(digits)
+
+    if random.choice([True, False]):
+        digits = _transpose(digits)
+
+    return digits
+
+
+def _relabel(digits):
+    translation_table = str.maketrans(ALL_DIGITS_STRING, ''.join(shuffle(ALL_DIGITS_STRING)))
+    return digits.translate(translation_table)
+
+
+def _permute_bands(digits):
     def copy_band(grid1, grid2, b1, b2):
         '''
         Copy band indexed by B1 from GRID1 into GRID2 (at index B2).
@@ -76,8 +137,7 @@ def _permute_bands(digits, permutation_index):
             for c in range(9):
                 grid2[target_row][c] = grid1[source_row][c]
 
-    assert 0 <= permutation_index < 6  # TODO Move this assertion to nth_permutation
-    perm = nth_permutation([0, 1, 2], permutation_index)
+    perm = shuffle([0, 1, 2])
     original = parse(digits)
     result = parse(zeros_string)
     for source_band, target_band in zip(range(3), perm):
@@ -85,7 +145,7 @@ def _permute_bands(digits, permutation_index):
     return serialize(result)
 
 
-def _permute_within_bands(digits, permutation_indices):
+def _permute_within_bands(digits):
     def copy_row(grid1, grid2, source_row, target_row):
         for c in range(9):
             grid2[target_row][c] = grid1[source_row][c]
@@ -93,30 +153,30 @@ def _permute_within_bands(digits, permutation_indices):
     original = parse(digits)
     result = parse(zeros_string)
 
-    for band_start, permutation_index in zip([0, 3, 6], permutation_indices):
+    for band_start in [0, 3, 6]:
         source_rows = range(band_start, band_start + 3)
-        target_rows = nth_permutation(source_rows, permutation_index)
+        target_rows = shuffle(source_rows)
         for s_row, t_row in zip(source_rows, target_rows):
             copy_row(original, result, s_row, t_row)
 
     return serialize(result)
 
 
-def _permute_stacks(digits, permutation_index):
+def _permute_stacks(digits):
     grid = parse(digits)
     grid = transpose_grid(grid)
     grid = parse(
-        _permute_bands(serialize(grid), permutation_index)
+        _permute_bands(serialize(grid))
     )
     grid = transpose_grid(grid)
     return serialize(grid)
 
 
-def _permute_within_stacks(digits, permutation_indices):
+def _permute_within_stacks(digits):
     grid = parse(digits)
     grid = transpose_grid(grid)
     grid = parse(
-        _permute_within_bands(serialize(grid), permutation_indices)
+        _permute_within_bands(serialize(grid))
     )
     grid = transpose_grid(grid)
     return serialize(grid)
@@ -126,54 +186,6 @@ def _transpose(digits):
     grid = parse(digits)
     grid = transpose_grid(grid)
     return serialize(grid)
-
-
-def transform(
-    digits,  # Should we take a grid or a digitstring?
-    *,
-    relabel=ALL_DIGITS_STRING,
-    permute_bands=0,
-    permute_within_bands=(0, 0, 0),
-    permute_stacks=0,
-    permute_within_stacks=(0, 0, 0),
-    transpose=False,
-):
-    '''
-    All optional arguments default to "skip this step".
-    '''
-
-    digits = _relabel(digits, relabel)
-
-    digits = _permute_bands(digits, permute_bands)
-    digits = _permute_within_bands(digits, permute_within_bands)
-
-    digits = _permute_stacks(digits, permute_stacks)
-    digits = _permute_within_stacks(digits, permute_within_stacks)
-
-    if transpose:
-        digits = _transpose(digits)
-
-    return digits  # Should we return a grid or a digitstring?
-
-
-def transform_random(digits):
-    return transform(
-        digits,
-        relabel = ''.join(nth_permutation(ALL_DIGITS_STRING, randrange(factorial(9)))),
-        permute_bands=randrange(factorial(3)),
-        permute_within_bands=(
-            randrange(factorial(3)),
-            randrange(factorial(3)),
-            randrange(factorial(3)),
-        ),
-        permute_stacks=randrange(factorial(3)),
-        permute_within_stacks=(
-            randrange(factorial(3)),
-            randrange(factorial(3)),
-            randrange(factorial(3)),
-        ),
-        transpose=random.choice([True, False]),
-    )
 
 
 def nth_permutation(seq, n):
@@ -196,5 +208,15 @@ def transpose_grid(m):
     return [list(i) for i in zip(*m)]
 
 
+def shuffle(seq):
+    lst = list(seq)
+    random.shuffle(lst)
+    return lst
+
+
 if __name__ == '__main__':
+    from browser import document
+    import browser
+    S = document.querySelector
+    SS = document.querySelectorAll
     main()
